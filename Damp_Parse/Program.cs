@@ -11,6 +11,8 @@ namespace Damp_Parse
 		static private int maxLineCount = 0;
 		static private int dataLineCount = 0;
 		static List<string> parsedLines = new List<string>();
+		static private int blockCount = 0;
+		static private bool inProgrammingBlock = false;
 
 		static void Main(string[] args)
 		{
@@ -31,7 +33,41 @@ namespace Damp_Parse
 						{
 							currString = sr.ReadLine().Trim();
 
-							if ((currString.StartsWith("S D8 a")) && (currString.EndsWith(" P")))
+							if (currString.StartsWith("Loading Patch "))
+							{
+								inProgrammingBlock = true;
+							}
+							else if (currString.EndsWith(" Loaded Successfully"))
+							{
+								inProgrammingBlock = false;
+								// Remove the end comma from the last data line
+								for (int i = parsedLines.Count - 1; i > 0; i--)
+								{
+									if (parsedLines[i].EndsWith("},"))
+									{
+										parsedLines[i] = parsedLines[i].TrimEnd(',');
+										break;
+									}
+								}
+
+								parsedLines.Insert(0, "#define DAMP_PROG_CMD_COUNT" + blockCount + " (" + dataLineCount + ")");
+								parsedLines.Insert(1, "#define DAMP_PROG_CMD_LENGTH" + blockCount + " (" + maxLineCount + ")");
+								parsedLines.Insert(2, "static const uint8 dampProgBlock" + blockCount + "[DAMP_PROG_CMD_COUNT" + blockCount + "][DAMP_PROG_CMD_LENGTH" + blockCount + "] = {");
+								parsedLines.Add("};");
+								parsedLines.Add("");
+
+								// Output the completed data
+								foreach (string line in parsedLines)
+								{
+									Console.WriteLine(line);
+								}
+
+								parsedLines = new List<string>();
+								blockCount++;
+								maxLineCount = 0;
+								dataLineCount = 0;
+							}
+							else if ((currString.StartsWith("S D8 a")) && (currString.EndsWith(" P")) && inProgrammingBlock)
 							{
 								// Write command data
 								currString = currString.Remove(0, currString.IndexOf("a") + 1);	// Remove the header
@@ -51,33 +87,7 @@ namespace Damp_Parse
 
 								parsedLines.Add("\t{" + currString + "},");
 							}
-							else if ((currString.StartsWith("S D9 a")) && (currString.EndsWith(" P")))
-							{
-								// Read needs to be performed
-								parsedLines.Add("/* Perform Read Here */");
-							}
 						}
-
-						// Remove the end comma from the last data line
-						for(int i = parsedLines.Count - 1; i > 0; i--)
-						{
-							if(parsedLines[i].EndsWith("},"))
-							{
-								parsedLines[i] = parsedLines[i].TrimEnd(',');
-								break;
-							}
-						}
-
-						parsedLines.Insert(0, "#define DAMP_COMMAND_COUNT (" + dataLineCount + ")");
-						parsedLines.Insert(1, "#define DAMP_COMMAND_LENGTH (" + maxLineCount + ")");
-						parsedLines.Insert(2, "static const uint8 dampCommands[DAMP_COMMAND_COUNT][DAMP_COMMAND_LENGTH] = {");
-						parsedLines.Add("};");
-					}
-
-					// Output the completed data
-					foreach(string line in parsedLines)
-					{
-						Console.WriteLine(line);
 					}
 				}
 				else
