@@ -1,12 +1,15 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Linq;
 
 namespace Damp_Parse
 {
 	class Program
 	{
 		static private string currString;
+		static private int maxLineCount = 0;
+		static private int dataLineCount = 0;
 		static List<string> parsedLines = new List<string>();
 
 		static void Main(string[] args)
@@ -24,8 +27,6 @@ namespace Damp_Parse
 				{
 					using (StreamReader sr = new StreamReader(args[0]))
 					{
-						parsedLines.Add("static const uint8 dampCommands {");
-
 						while (sr.Peek() >= 0)
 						{
 							currString = sr.ReadLine().Trim();
@@ -37,6 +38,16 @@ namespace Damp_Parse
 								currString = currString.TrimEnd(' ', 'P');						// Remove the footer
 								currString = currString.Replace(" ", ", 0x");					// Replace all spaces to make is C-style hex values
 								currString = currString.Remove(0, currString.IndexOf("0x"));	// Remove extra hex chuff at the start
+
+								// determine the number of bytes in the command
+								int count = currString.Count(f => f == 'x');
+								if (count > maxLineCount)
+								{
+									// store the maximum command length found
+									maxLineCount = count;
+								}
+
+								dataLineCount++;
 
 								parsedLines.Add("\t{" + currString + "},");
 							}
@@ -57,6 +68,9 @@ namespace Damp_Parse
 							}
 						}
 
+						parsedLines.Insert(0, "#define DAMP_COMMAND_COUNT (" + dataLineCount + ")");
+						parsedLines.Insert(1, "#define DAMP_COMMAND_LENGTH (" + maxLineCount + ")");
+						parsedLines.Insert(2, "static const uint8 dampCommands[DAMP_COMMAND_COUNT][DAMP_COMMAND_LENGTH] = {");
 						parsedLines.Add("};");
 					}
 
