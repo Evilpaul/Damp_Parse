@@ -29,6 +29,8 @@ namespace Damp_Parse
 				{
 					using (StreamReader sr = new StreamReader(args[0]))
 					{
+						Console.WriteLine("/* Data generated " + DateTime.Now.ToString("G") + " from \"" + args[0] + "\" */");
+
 						while (sr.Peek() >= 0)
 						{
 							currString = sr.ReadLine().Trim();
