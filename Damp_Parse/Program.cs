@@ -37,37 +37,52 @@ namespace Damp_Parse
 
 							if (currString.StartsWith("Loading Patch "))
 							{
+								if (inProgrammingBlock)
+								{
+									// Error! end of block not found
+									Console.WriteLine("#error End of block not found!");
+									Console.WriteLine("");
+								}
 								inProgrammingBlock = true;
 							}
 							else if (currString.EndsWith(" Loaded Successfully"))
 							{
-								inProgrammingBlock = false;
-								// Remove the end comma from the last data line
-								for (int i = parsedLines.Count - 1; i > 0; i--)
+								if(inProgrammingBlock)
 								{
-									if (parsedLines[i].EndsWith("},"))
+									inProgrammingBlock = false;
+									// Remove the end comma from the last data line
+									for (int i = parsedLines.Count - 1; i > 0; i--)
 									{
-										parsedLines[i] = parsedLines[i].TrimEnd(',');
-										break;
+										if (parsedLines[i].EndsWith("},"))
+										{
+											parsedLines[i] = parsedLines[i].TrimEnd(',');
+											break;
+										}
 									}
+
+									parsedLines.Insert(0, "#define DAMP_PROG_CMD_COUNT" + blockCount + " (" + dataLineCount + ")");
+									parsedLines.Insert(1, "#define DAMP_PROG_CMD_LENGTH" + blockCount + " (" + maxLineCount + ")");
+									parsedLines.Insert(2, "static const uint8 dampProgBlock" + blockCount + "[DAMP_PROG_CMD_COUNT" + blockCount + "][DAMP_PROG_CMD_LENGTH" + blockCount + "] = {");
+									parsedLines.Add("};");
+									parsedLines.Add("");
+
+									// Output the completed data
+									foreach (string line in parsedLines)
+									{
+										Console.WriteLine(line);
+									}
+
+									parsedLines = new List<string>();
+									blockCount++;
+									maxLineCount = 0;
+									dataLineCount = 0;
 								}
-
-								parsedLines.Insert(0, "#define DAMP_PROG_CMD_COUNT" + blockCount + " (" + dataLineCount + ")");
-								parsedLines.Insert(1, "#define DAMP_PROG_CMD_LENGTH" + blockCount + " (" + maxLineCount + ")");
-								parsedLines.Insert(2, "static const uint8 dampProgBlock" + blockCount + "[DAMP_PROG_CMD_COUNT" + blockCount + "][DAMP_PROG_CMD_LENGTH" + blockCount + "] = {");
-								parsedLines.Add("};");
-								parsedLines.Add("");
-
-								// Output the completed data
-								foreach (string line in parsedLines)
+								else
 								{
-									Console.WriteLine(line);
+									// Error! start of block not found
+									Console.WriteLine("#error Start of block not found!");
+									Console.WriteLine("");
 								}
-
-								parsedLines = new List<string>();
-								blockCount++;
-								maxLineCount = 0;
-								dataLineCount = 0;
 							}
 							else if ((currString.StartsWith("S D8 a")) && (currString.EndsWith(" P")) && inProgrammingBlock)
 							{
@@ -89,6 +104,13 @@ namespace Damp_Parse
 
 								parsedLines.Add("\t{" + currString + "},");
 							}
+						}
+
+						if(inProgrammingBlock)
+						{
+							// Error! end of block not found
+							Console.WriteLine("#error End of block not found!");
+							Console.WriteLine("");
 						}
 					}
 				}
