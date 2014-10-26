@@ -8,7 +8,6 @@ namespace Damp_Parse
 	class Program
 	{
 		static private string currString;
-		static private int maxLineCount = 0;
 		static private int dataLineCount = 0;
 		static List<string> parsedLines = new List<string>();
 		static private int blockCount = 0;
@@ -50,19 +49,16 @@ namespace Damp_Parse
 								if(inProgrammingBlock)
 								{
 									inProgrammingBlock = false;
-									// Remove the end comma from the last data line
-									for (int i = parsedLines.Count - 1; i > 0; i--)
-									{
-										if (parsedLines[i].EndsWith("},"))
-										{
-											parsedLines[i] = parsedLines[i].TrimEnd(',');
-											break;
-										}
-									}
 
-									parsedLines.Insert(0, "#define DAMP_PROG_CMD_COUNT" + blockCount + " (" + dataLineCount + ")");
-									parsedLines.Insert(1, "#define DAMP_PROG_CMD_LENGTH" + blockCount + " (" + maxLineCount + ")");
-									parsedLines.Insert(2, "static const uint8 dampProgBlock" + blockCount + "[DAMP_PROG_CMD_COUNT" + blockCount + "][DAMP_PROG_CMD_LENGTH" + blockCount + "] = {");
+									parsedLines.Add("");
+									parsedLines.Add("static const I2cIf_SequenceJobCfgType I2cIf_Sequence_DAMP_Prog" + blockCount + "_Jobs[] =");
+									parsedLines.Add("{");
+
+									for(int i = 0; i < dataLineCount; i++)
+									{
+										parsedLines.Add("\t{ I2CIF_JOB_WRITE, sizeof(Damp_ProgFile" + blockCount + "_" + i + "), (uint8 *)&Damp_ProgFile" + blockCount + "_" + i + "[0] },");
+									}
+									parsedLines[parsedLines.Count - 1] = parsedLines[parsedLines.Count - 1].TrimEnd(',');
 									parsedLines.Add("};");
 									parsedLines.Add("");
 
@@ -74,7 +70,6 @@ namespace Damp_Parse
 
 									parsedLines = new List<string>();
 									blockCount++;
-									maxLineCount = 0;
 									dataLineCount = 0;
 								}
 								else
@@ -94,15 +89,10 @@ namespace Damp_Parse
 
 								// determine the number of bytes in the command
 								int count = currString.Count(f => f == 'x');
-								if (count > maxLineCount)
-								{
-									// store the maximum command length found
-									maxLineCount = count;
-								}
+
+								parsedLines.Add("static const uint8 Damp_ProgFile" + blockCount + "_"+ dataLineCount + "[] = {" + currString + "};");
 
 								dataLineCount++;
-
-								parsedLines.Add("\t{" + currString + "},");
 							}
 						}
 
@@ -111,6 +101,31 @@ namespace Damp_Parse
 							// Error! end of block not found
 							Console.WriteLine("#error End of block not found!");
 							Console.WriteLine("");
+						}
+
+						parsedLines = new List<string>();
+
+						for (int i = 0; i < blockCount; i++)
+						{
+							parsedLines.Add("#define I2CIF_N_SEQUENCE_DAMP" + i + "_JOBS (sizeof(I2cIf_Sequence_DAMP_Prog" + i + "_Jobs) / sizeof(I2cIf_SequenceJobCfgType))");
+						}
+
+						parsedLines.Add("static const I2cIf_SequenceCfgType I2cIf_Sequences[] =");
+						parsedLines.Add("{");
+						for (int i = 0; i < blockCount; i++)
+						{
+							parsedLines.Add("\t{");
+							parsedLines.Add("\t\tI2CIF_N_SEQUENCE_DAMP" + i + "_JOBS,");
+							parsedLines.Add("\t\t&I2cIf_Sequence_DAMP_Prog" + i + "_Jobs[0]");
+							parsedLines.Add("\t},");
+						}
+						parsedLines[parsedLines.Count - 1] = parsedLines[parsedLines.Count - 1].TrimEnd(',');
+						parsedLines.Add("};");
+
+						// Output the completed data
+						foreach (string line in parsedLines)
+						{
+							Console.WriteLine(line);
 						}
 					}
 				}
